@@ -1,4 +1,4 @@
-# Crisis Response-dApp
+# Crisis Response dApp
 
 A decentralized Web3 application for crisis reporting and humanitarian aid during national emergencies. Built with React, Next.js, Hardhat, and IPFS.
 
