@@ -185,4 +185,4 @@ For support and questions:
 - [ ] Integration with emergency services APIs
 - [ ] Mobile application
 - [ ] Advanced analytics dashboard
-- [ ] DAO governance for fund allocation 
+- [ ] DAO governance for fund allocation
