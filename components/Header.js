@@ -9,21 +9,64 @@ export default function Header() {
 
   useEffect(() => {
     // Check if wallet is already connected
+    checkWalletConnection();
+
+    // Listen for wallet connection changes
     if (typeof window.ethereum !== 'undefined') {
-      window.ethereum.request({ method: 'eth_accounts' })
-        .then(accounts => {
-          if (accounts.length > 0) {
-            setWalletAddress(accounts[0]);
-          }
-        });
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
     }
+
+    return () => {
+      if (typeof window.ethereum !== 'undefined') {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      }
+    };
   }, []);
+
+  const checkWalletConnection = async () => {
+    try {
+      if (typeof window.ethereum !== 'undefined') {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+          // Dispatch custom event to notify other components
+          window.dispatchEvent(new CustomEvent('walletConnected', { detail: accounts[0] }));
+        } else {
+          setWalletAddress('');
+          window.dispatchEvent(new CustomEvent('walletDisconnected'));
+        }
+      }
+    } catch (error) {
+      console.error('Error checking wallet connection:', error);
+      setWalletAddress('');
+      window.dispatchEvent(new CustomEvent('walletDisconnected'));
+    }
+  };
+
+  const handleAccountsChanged = (accounts) => {
+    if (accounts.length === 0) {
+      setWalletAddress('');
+      window.dispatchEvent(new CustomEvent('walletDisconnected'));
+    } else {
+      setWalletAddress(accounts[0]);
+      window.dispatchEvent(new CustomEvent('walletConnected', { detail: accounts[0] }));
+    }
+  };
+
+  const handleChainChanged = () => {
+    // Reload the page when chain changes
+    window.location.reload();
+  };
 
   const handleConnectWallet = async () => {
     setIsConnecting(true);
     try {
       const { address } = await connectWallet();
       setWalletAddress(address);
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent('walletConnected', { detail: address }));
     } catch (error) {
       console.error('Failed to connect wallet:', error);
       alert('Failed to connect wallet. Please make sure MetaMask is installed.');

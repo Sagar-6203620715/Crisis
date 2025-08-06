@@ -8,20 +8,67 @@ export default function DonationsList() {
   const [totalDonations, setTotalDonations] = useState('0');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [walletConnected, setWalletConnected] = useState(false);
 
   useEffect(() => {
-    fetchDonations();
+    checkWalletConnection();
+
+    // Listen for wallet connection events
+    const handleWalletConnected = () => {
+      setWalletConnected(true);
+      fetchDonations();
+    };
+
+    const handleWalletDisconnected = () => {
+      setWalletConnected(false);
+      setDonations([]);
+      setTotalDonations('0');
+      setError(null);
+    };
+
+    window.addEventListener('walletConnected', handleWalletConnected);
+    window.addEventListener('walletDisconnected', handleWalletDisconnected);
+
+    return () => {
+      window.removeEventListener('walletConnected', handleWalletConnected);
+      window.removeEventListener('walletDisconnected', handleWalletDisconnected);
+    };
   }, []);
+
+  const checkWalletConnection = async () => {
+    try {
+      if (typeof window.ethereum !== 'undefined') {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+          setWalletConnected(true);
+          fetchDonations();
+        } else {
+          setWalletConnected(false);
+          setLoading(false);
+        }
+      } else {
+        setWalletConnected(false);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error checking wallet connection:', error);
+      setWalletConnected(false);
+      setLoading(false);
+    }
+  };
 
   const fetchDonations = async () => {
     try {
       setLoading(true);
+      setError(null);
       const contract = getContract();
       
-      const [donationsData, totalAmount] = await Promise.all([
-        contract.getAllDonations(),
-        contract.totalDonations()
-      ]);
+      // Fetch total donations
+      const total = await contract.totalDonations();
+      setTotalDonations(formatEther(total));
+      
+      // Fetch all donations
+      const donationsData = await contract.getAllDonations();
       
       const formattedDonations = donationsData.map((donation, index) => ({
         id: index,
@@ -32,10 +79,13 @@ export default function DonationsList() {
       }));
 
       setDonations(formattedDonations.reverse()); // Show newest first
-      setTotalDonations(formatEther(totalAmount));
     } catch (error) {
       console.error('Error fetching donations:', error);
-      setError('Failed to load donations');
+      if (error.message.includes('Wallet not connected')) {
+        setError('Please connect your wallet to view donations');
+      } else {
+        setError('Failed to load donations');
+      }
     } finally {
       setLoading(false);
     }
@@ -59,13 +109,33 @@ export default function DonationsList() {
     );
   }
 
+  if (!walletConnected) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-gray-500 mb-6">
+          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+          </svg>
+          <p className="text-lg font-medium">Connect Your Wallet</p>
+          <p className="text-sm">Please connect your MetaMask wallet to view donations</p>
+        </div>
+        <button 
+          onClick={checkWalletConnection}
+          className="btn-primary"
+        >
+          Check Wallet Connection
+        </button>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">{error}</p>
+        <div className="text-red-600 mb-4">{error}</div>
         <button 
           onClick={fetchDonations}
-          className="btn-primary mt-4"
+          className="btn-primary"
         >
           Try Again
         </button>
@@ -75,74 +145,66 @@ export default function DonationsList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Donations</h2>
-        <button 
-          onClick={fetchDonations}
-          className="btn-secondary"
-        >
-          Refresh
-        </button>
-      </div>
-
       {/* Total Donations Card */}
       <div className="card bg-gradient-to-r from-green-500 to-green-600 text-white">
         <div className="text-center">
-          <h3 className="text-lg font-medium mb-2">Total Donations</h3>
-          <p className="text-3xl font-bold">{totalDonations} ETH</p>
-          <p className="text-sm opacity-90 mt-1">
-            {donations.length} donation{donations.length !== 1 ? 's' : ''} received
+          <h3 className="text-lg font-semibold mb-2">Total Donations</h3>
+          <div className="text-3xl font-bold">{totalDonations} ETH</div>
+          <p className="text-green-100 text-sm mt-2">
+            Supporting crisis relief efforts
           </p>
         </div>
       </div>
 
+      {/* Donations List */}
       {donations.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-600">No donations received yet.</p>
-          <p className="text-sm text-gray-500 mt-2">Be the first to make a donation.</p>
+          <div className="text-gray-500 mb-4">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+            <p className="text-lg font-medium">No donations yet</p>
+            <p className="text-sm">Be the first to support crisis relief efforts</p>
+          </div>
+          <a href="/donate" className="btn-primary">
+            Make First Donation
+          </a>
         </div>
       ) : (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Donations</h3>
-          
-          <div className="space-y-3">
-            {donations.map((donation) => (
-              <div key={donation.id} className="card hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+          {donations.map((donation) => (
+            <div key={donation.id} className="card border-l-4 border-green-500">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                       </svg>
                     </div>
-                    
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <div className="font-semibold text-gray-900">
                         {formatAddress(donation.donor)}
-                      </p>
-                      <p className="text-sm text-gray-500">
+                      </div>
+                      <div className="text-sm text-gray-500">
                         {formatDate(donation.timestamp)}
-                      </p>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="text-right">
-                    <p className="font-bold text-green-600 text-lg">
-                      {donation.amount} ETH
-                    </p>
-                  </div>
-                </div>
-                
-                {donation.message && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-sm text-gray-600 italic">
+                  {donation.message && (
+                    <p className="text-gray-600 text-sm italic">
                       "{donation.message}"
                     </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-green-600">
+                    {donation.amount} ETH
                   </div>
-                )}
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
