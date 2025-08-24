@@ -2,7 +2,7 @@
 
 A decentralized Web3 application for crisis reporting and humanitarian aid during national emergencies. Built with React, Next.js, Hardhat, and IPFS.
 
-## Feature
+## Features
 
 - **Crisis Reporting**: Submit verified crisis reports with images and location data
 - **IPFS Storage**: Secure, decentralized storage for images and metadata
