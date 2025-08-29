@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { connectWallet, formatAddress } from '../utils/web3';
+import { connectWallet, disconnectWallet, isWalletConnected, formatAddress } from '../utils/web3';
 
 export default function Header() {
   const [walletAddress, setWalletAddress] = useState('');
@@ -10,54 +10,24 @@ export default function Header() {
   useEffect(() => {
     // Check if wallet is already connected
     checkWalletConnection();
-
-    // Listen for wallet connection changes
-    if (typeof window.ethereum !== 'undefined') {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
-    }
-
-    return () => {
-      if (typeof window.ethereum !== 'undefined') {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
-      }
-    };
   }, []);
 
   const checkWalletConnection = async () => {
     try {
-      if (typeof window.ethereum !== 'undefined') {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          setWalletAddress(accounts[0]);
-          // Dispatch custom event to notify other components
-          window.dispatchEvent(new CustomEvent('walletConnected', { detail: accounts[0] }));
-        } else {
-          setWalletAddress('');
-          window.dispatchEvent(new CustomEvent('walletDisconnected'));
-        }
+      const address = await isWalletConnected();
+      if (address) {
+        setWalletAddress(address);
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent('walletConnected', { detail: address }));
+      } else {
+        setWalletAddress('');
+        window.dispatchEvent(new CustomEvent('walletDisconnected'));
       }
     } catch (error) {
       console.error('Error checking wallet connection:', error);
       setWalletAddress('');
       window.dispatchEvent(new CustomEvent('walletDisconnected'));
     }
-  };
-
-  const handleAccountsChanged = (accounts) => {
-    if (accounts.length === 0) {
-      setWalletAddress('');
-      window.dispatchEvent(new CustomEvent('walletDisconnected'));
-    } else {
-      setWalletAddress(accounts[0]);
-      window.dispatchEvent(new CustomEvent('walletConnected', { detail: accounts[0] }));
-    }
-  };
-
-  const handleChainChanged = () => {
-    // Reload the page when chain changes
-    window.location.reload();
   };
 
   const handleConnectWallet = async () => {
@@ -69,10 +39,16 @@ export default function Header() {
       window.dispatchEvent(new CustomEvent('walletConnected', { detail: address }));
     } catch (error) {
       console.error('Failed to connect wallet:', error);
-      alert('Failed to connect wallet. Please make sure MetaMask is installed.');
+      alert('Failed to connect wallet. Please make sure Coinbase Wallet is installed.');
     } finally {
       setIsConnecting(false);
     }
+  };
+
+  const handleDisconnectWallet = () => {
+    disconnectWallet();
+    setWalletAddress('');
+    window.dispatchEvent(new CustomEvent('walletDisconnected'));
   };
 
   return (
@@ -105,6 +81,12 @@ export default function Header() {
                   Connected: {formatAddress(walletAddress)}
                 </span>
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <button
+                  onClick={handleDisconnectWallet}
+                  className="text-sm text-gray-500 hover:text-crisis-red"
+                >
+                  Disconnect
+                </button>
               </div>
             ) : (
               <button
@@ -112,7 +94,7 @@ export default function Header() {
                 disabled={isConnecting}
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                {isConnecting ? 'Connecting...' : 'Connect Coinbase Wallet'}
               </button>
             )}
           </div>

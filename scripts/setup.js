@@ -16,6 +16,7 @@ NEXT_PUBLIC_INFURA_PROJECT_SECRET=your_infura_project_secret
 # Network Configuration
 NEXT_PUBLIC_NETWORK_ID=1337
 NEXT_PUBLIC_NETWORK_NAME=Hardhat Local
+NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8545
 `;
 
   fs.writeFileSync(envPath, envContent);

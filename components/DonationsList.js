@@ -37,15 +37,11 @@ export default function DonationsList() {
 
   const checkWalletConnection = async () => {
     try {
-      if (typeof window.ethereum !== 'undefined') {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          setWalletConnected(true);
-          fetchDonations();
-        } else {
-          setWalletConnected(false);
-          setLoading(false);
-        }
+      const { isWalletConnected } = await import('../utils/web3');
+      const address = await isWalletConnected();
+      if (address) {
+        setWalletConnected(true);
+        fetchDonations();
       } else {
         setWalletConnected(false);
         setLoading(false);
@@ -117,7 +113,7 @@ export default function DonationsList() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
           </svg>
           <p className="text-lg font-medium">Connect Your Wallet</p>
-          <p className="text-sm">Please connect your MetaMask wallet to view donations</p>
+                     <p className="text-sm">Please connect your Coinbase Wallet to view donations</p>
         </div>
         <button 
           onClick={checkWalletConnection}

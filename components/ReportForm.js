@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { getContract } from '../utils/web3';
-import { uploadToIPFS, uploadToPublicIPFS } from '../utils/ipfs';
 
 export default function ReportForm() {
   const [formData, setFormData] = useState({
@@ -33,6 +32,30 @@ export default function ReportForm() {
     }));
   };
 
+  const uploadFileViaAPI = async (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/ipfs', {
+      method: 'POST',
+      body: fd,
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    const data = await res.json();
+    return data.cid;
+  };
+
+  const uploadJSONViaAPI = async (json) => {
+    const fd = new FormData();
+    fd.append('json', JSON.stringify(json));
+    const res = await fetch('/api/ipfs', {
+      method: 'POST',
+      body: fd,
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    const data = await res.json();
+    return data.cid;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -45,9 +68,9 @@ export default function ReportForm() {
     setUploadProgress(0);
 
     try {
-      // Upload image to IPFS
+      // Upload image via server API
       setUploadProgress(25);
-      const imageResult = await uploadToIPFS(selectedFile);
+      const imageCid = await uploadFileViaAPI(selectedFile);
       
       setUploadProgress(50);
       
@@ -56,13 +79,12 @@ export default function ReportForm() {
         title: formData.title,
         description: formData.description,
         location: formData.location,
-        imageHash: imageResult.cid,
+        imageHash: imageCid,
         timestamp: Date.now(),
-        reporter: 'anonymous' // Will be replaced with actual address
       };
 
-      // Upload metadata to IPFS
-      const metadataResult = await uploadToPublicIPFS(metadata);
+      // Upload metadata via server API
+      const metadataCid = await uploadJSONViaAPI(metadata);
       
       setUploadProgress(75);
 
@@ -72,8 +94,8 @@ export default function ReportForm() {
         formData.title,
         formData.description,
         formData.location,
-        imageResult.cid,
-        metadataResult.cid
+        imageCid,
+        metadataCid
       );
 
       await tx.wait();

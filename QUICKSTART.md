@@ -5,7 +5,7 @@ Get the Crisis Response dApp running in 5 minutes!
 ## Prerequisites
 
 - Node.js 18+ installed
-- MetaMask browser extension
+- Coinbase Wallet browser extension or mobile app
 - Git
 
 ## Step 1: Clone and Setup
@@ -49,9 +49,9 @@ CrisisReporting deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
 Deployer verified as reporter: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 ```
 
-## Step 4: Configure MetaMask
+## Step 4: Configure Coinbase Wallet
 
-1. Open MetaMask
+1. Open Coinbase Wallet (browser extension or mobile app)
 2. Add a new network:
    - Network Name: `Hardhat Local`
    - RPC URL: `http://127.0.0.1:8545`
@@ -71,14 +71,14 @@ Visit `http://localhost:3000` in your browser!
 
 ## Step 6: Test the dApp
 
-1. **Connect Wallet**: Click "Connect Wallet" and approve in MetaMask
+1. **Connect Wallet**: Click "Connect Coinbase Wallet" and approve in Coinbase Wallet
 2. **Submit Report**: Go to Reports page, fill form, upload image, submit
 3. **Make Donation**: Go to Donate page, enter amount, donate
 4. **View Data**: Check the homepage to see reports and donations
 
 ## Troubleshooting
 
-### MetaMask Connection Issues
+### Coinbase Wallet Connection Issues
 - Ensure you're connected to Hardhat Local network
 - Check that the RPC URL is correct: `http://127.0.0.1:8545`
 - Make sure the Hardhat node is running
@@ -103,5 +103,5 @@ Visit `http://localhost:3000` in your browser!
 If you encounter issues:
 1. Check the browser console for errors
 2. Verify all services are running (Hardhat node, Next.js dev server)
-3. Ensure MetaMask is properly configured
+3. Ensure Coinbase Wallet is properly configured
 4. Check the [README.md](README.md) for detailed troubleshooting 

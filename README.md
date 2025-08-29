@@ -8,7 +8,7 @@ A decentralized Web3 application for crisis reporting and humanitarian aid durin
 - **IPFS Storage**: Secure, decentralized storage for images and metadata
 - **Blockchain Donations**: Transparent ETH donations with full traceability
 - **Verification System**: Community-driven verification of crisis reports
-- **MetaMask Integration**: Seamless wallet connection and transaction signing
+- **Coinbase Wallet Integration**: Seamless wallet connection and transaction signing
 
 ## Tech Stack
 
@@ -16,7 +16,7 @@ A decentralized Web3 application for crisis reporting and humanitarian aid durin
 - **Blockchain**: Ethereum, Hardhat, ethers.js
 - **Storage**: IPFS (Infura)
 - **Smart Contracts**: Solidity, OpenZeppelin
-- **Wallet**: MetaMask integration
+- **Wallet**: Coinbase Wallet SDK
 
 ## Project Structure
 
@@ -59,7 +59,7 @@ crisis-reporting-dapp/
 
 ### Prerequisites
 - Node.js 18+ 
-- MetaMask browser extension
+- Coinbase Wallet browser extension or mobile app
 - Git
 
 ### 1. Clone and Install
@@ -112,8 +112,8 @@ Visit `http://localhost:3000` to see the application.
 ## Usage
 
 ### Connecting Wallet
-1. Click "Connect Wallet" in the header
-2. Approve MetaMask connection
+1. Click "Connect Coinbase Wallet" in the header
+2. Approve Coinbase Wallet connection
 3. Ensure you're connected to the correct network (Hardhat localhost:8545)
 
 ### Submitting Reports
@@ -121,14 +121,14 @@ Visit `http://localhost:3000` to see the application.
 2. Fill in report details (title, description, location)
 3. Upload an image (supports JPG, PNG, GIF)
 4. Click "Submit Report"
-5. Approve MetaMask transaction
+5. Approve Coinbase Wallet transaction
 
 ### Making Donations
 1. Navigate to "Donate" page
 2. Enter donation amount in ETH
 3. Add optional message
 4. Click "Donate Now"
-5. Approve MetaMask transaction
+5. Approve Coinbase Wallet transaction
 
 ### Verifying Reports
 - Only verified reporters can verify other reports
