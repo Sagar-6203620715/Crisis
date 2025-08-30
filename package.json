@@ -11,7 +11,8 @@
     "test": "hardhat test",
     "deploy": "hardhat run scripts/deploy.js --network localhost",
     "node": "hardhat node",
-    "setup": "node scripts/setup.js"
+    "setup": "node scripts/setup.js",
+    "test-setup": "hardhat run scripts/test-setup.js --network localhost"
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.3.7",

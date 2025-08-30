@@ -1,297 +1,627 @@
 'use client';
-
 import { useState, useEffect } from 'react';
-import { getContract, formatAddress, formatEther } from '../utils/web3';
-import { getIPFSGatewayURL } from '../utils/ipfs';
 
-export default function ReportsList() {
+const ReportsList = () => {
   const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [verifying, setVerifying] = useState({});
-  const [walletConnected, setWalletConnected] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [currentReporter, setCurrentReporter] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
 
   useEffect(() => {
-    checkWalletConnection();
-
-    // Listen for wallet connection events
-    const handleWalletConnected = () => {
-      setWalletConnected(true);
-      fetchReports();
-    };
-
-    const handleWalletDisconnected = () => {
-      setWalletConnected(false);
-      setReports([]);
-      setError(null);
-    };
-
-    window.addEventListener('walletConnected', handleWalletConnected);
-    window.addEventListener('walletDisconnected', handleWalletDisconnected);
-
-    return () => {
-      window.removeEventListener('walletConnected', handleWalletConnected);
-      window.removeEventListener('walletDisconnected', handleWalletDisconnected);
-    };
+    loadReports();
+    loadCurrentReporter();
   }, []);
 
-  const checkWalletConnection = async () => {
-    try {
-      const { isWalletConnected } = await import('../utils/web3');
-      const address = await isWalletConnected();
-      if (address) {
-        setWalletConnected(true);
-        fetchReports();
-      } else {
-        setWalletConnected(false);
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Error checking wallet connection:', error);
-      setWalletConnected(false);
-      setLoading(false);
+  const loadReports = () => {
+    const storedReports = localStorage.getItem('crisisReports');
+    if (storedReports) {
+      setReports(JSON.parse(storedReports));
     }
   };
 
-  const fetchReports = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const contract = getContract();
-      const reportsData = await contract.getAllReports();
-      
-      const formattedReports = reportsData.map((report, index) => ({
-        id: index,
-        title: report.title,
-        description: report.description,
-        location: report.location,
-        imageHash: report.imageHash,
-        ipfsCID: report.ipfsCID,
-        reporter: report.reporter,
-        timestamp: new Date(Number(report.timestamp) * 1000),
-        verified: report.verified,
-        verificationCount: Number(report.verificationCount)
-      }));
-
-      setReports(formattedReports.reverse()); // Show newest first
-    } catch (error) {
-      console.error('Error fetching reports:', error);
-      if (error.message.includes('Wallet not connected')) {
-        setError('Please connect your wallet to view reports');
-      } else {
-        setError('Failed to load reports');
-      }
-    } finally {
-      setLoading(false);
+  const loadCurrentReporter = () => {
+    const storedReporter = localStorage.getItem('currentReporter');
+    if (storedReporter) {
+      setCurrentReporter(JSON.parse(storedReporter));
     }
   };
 
-  const handleVerifyReport = async (reportId) => {
-    try {
-      setVerifying(prev => ({ ...prev, [reportId]: true }));
-      const contract = getContract();
-      const tx = await contract.verifyReport(reportId);
-      await tx.wait();
-      
-      // Refresh reports after verification
-      await fetchReports();
-      alert('Report verified successfully!');
-    } catch (error) {
-      console.error('Error verifying report:', error);
-      if (error.message.includes('Only verified reporters')) {
-        alert('Only verified reporters can verify reports. Contact the platform administrator to become a verified reporter.');
-      } else if (error.message.includes('Already verified')) {
-        alert('You have already verified this report.');
-      } else if (error.message.includes('Cannot verify your own')) {
-        alert('You cannot verify your own report.');
-      } else {
-        alert('Failed to verify report. Please try again.');
-      }
-    } finally {
-      setVerifying(prev => ({ ...prev, [reportId]: false }));
+  const getSeverityColor = (severity) => {
+    switch (severity.toLowerCase()) {
+      case 'critical': return 'bg-red-500';
+      case 'high': return 'bg-orange-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'low': return 'bg-green-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getCategoryIcon = (category) => {
+    switch (category.toLowerCase()) {
+      case 'natural disaster': return '🌪️';
+      case 'medical emergency': return '🏥';
+      case 'fire': return '🔥';
+      case 'accident': return '🚗';
+      case 'security threat': return '🚨';
+      default: return '⚠️';
     }
   };
 
   const formatDate = (timestamp) => {
-    return timestamp.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return new Date(timestamp).toLocaleString();
   };
 
-  const getVerificationStatus = (verified, verificationCount) => {
-    if (verified) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-          Verified ({verificationCount} verifications)
-        </span>
-      );
-    } else if (verificationCount > 0) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-          Pending ({verificationCount}/3 verifications)
-        </span>
-      );
+  const getVerificationStatus = (report) => {
+    const approvals = report.approvals || [];
+    const uniqueApprovals = [...new Set(approvals)];
+    
+    if (uniqueApprovals.length >= 3) {
+      return { status: 'verified', color: 'text-green-600', bgColor: 'bg-green-100' };
+    } else if (uniqueApprovals.length > 0) {
+      return { status: 'pending', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
     } else {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-          Unverified (0/3 verifications)
-        </span>
-      );
+      return { status: 'unverified', color: 'text-red-600', bgColor: 'bg-red-100' };
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-crisis-red"></div>
-      </div>
-    );
-  }
+  const handleApproveReport = async (reportId) => {
+    if (!currentReporter) {
+      setShowAuthModal(true);
+      return;
+    }
 
-  if (!walletConnected) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-gray-500 mb-6">
-          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <p className="text-lg font-medium">Connect Your Wallet</p>
-                     <p className="text-sm">Please connect your Coinbase Wallet to view crisis reports</p>
+    setVerifying(true);
+    
+    try {
+      const updatedReports = reports.map(report => {
+        if (report.id === reportId) {
+          const approvals = report.approvals || [];
+          if (!approvals.includes(currentReporter.id)) {
+            return {
+              ...report,
+              approvals: [...approvals, currentReporter.id]
+            };
+          }
+        }
+        return report;
+      });
+
+      localStorage.setItem('crisisReports', JSON.stringify(updatedReports));
+      setReports(updatedReports);
+    } catch (error) {
+      console.error('Error approving report:', error);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const hasReporterApproved = (report) => {
+    if (!currentReporter) return false;
+    const approvals = report.approvals || [];
+    return approvals.includes(currentReporter.id);
+  };
+
+  const handleReporterRegister = (reporterData) => {
+    const existingReporters = JSON.parse(localStorage.getItem('reporters') || '[]');
+    
+    if (existingReporters.find(r => r.email === reporterData.email)) {
+      alert('A reporter with this email already exists!');
+      return false;
+    }
+
+    const newReporter = {
+      id: Date.now().toString(),
+      ...reporterData,
+      registeredAt: new Date().toISOString()
+    };
+
+    existingReporters.push(newReporter);
+    localStorage.setItem('reporters', JSON.stringify(existingReporters));
+    localStorage.setItem('currentReporter', JSON.stringify(newReporter));
+    
+    setCurrentReporter(newReporter);
+    setShowAuthModal(false);
+    return true;
+  };
+
+  const handleReporterLogin = (loginData) => {
+    const existingReporters = JSON.parse(localStorage.getItem('reporters') || '[]');
+    const reporter = existingReporters.find(r => r.email === loginData.email && r.password === loginData.password);
+    
+    if (reporter) {
+      localStorage.setItem('currentReporter', JSON.stringify(reporter));
+      setCurrentReporter(reporter);
+      setShowAuthModal(false);
+      return true;
+    } else {
+      alert('Invalid email or password!');
+      return false;
+    }
+  };
+
+  const handleReporterLogout = () => {
+    localStorage.removeItem('currentReporter');
+    setCurrentReporter(null);
+  };
+
+  const handleDeleteAllData = () => {
+    if (confirm('Are you sure you want to delete ALL data? This cannot be undone!')) {
+      localStorage.removeItem('crisisReports');
+      localStorage.removeItem('reporters');
+      localStorage.removeItem('currentReporter');
+      setReports([]);
+      setCurrentReporter(null);
+    }
+  };
+
+  const handleDeleteAllReports = () => {
+    if (confirm('Are you sure you want to delete all reports? This cannot be undone!')) {
+      localStorage.removeItem('crisisReports');
+      setReports([]);
+    }
+  };
+
+  const handleDeleteAllReporters = () => {
+    if (confirm('Are you sure you want to delete all reporters? This cannot be undone!')) {
+      localStorage.removeItem('reporters');
+      localStorage.removeItem('currentReporter');
+      setCurrentReporter(null);
+    }
+  };
+
+  const filteredReports = reports.filter(report => {
+    const matchesSearch = report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         report.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         report.location.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filter === 'all' || 
+                         (filter === 'verified' && getVerificationStatus(report).status === 'verified') ||
+                         (filter === 'pending' && getVerificationStatus(report).status === 'pending') ||
+                         (filter === 'unverified' && getVerificationStatus(report).status === 'unverified');
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  const ReporterLoginForm = () => (
+    <div className="bg-white rounded-lg p-6 shadow-xl">
+      <h3 className="text-xl font-bold mb-4 text-gray-800">Reporter Login</h3>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        handleReporterLogin({
+          email: formData.get('email'),
+          password: formData.get('password')
+        });
+      }}>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <input
+            type="email"
+            name="email"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-        <button 
-          onClick={checkWalletConnection}
-          className="btn-primary"
-        >
-          Check Wallet Connection
-        </button>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-red-600 mb-4">{error}</div>
-        <button 
-          onClick={fetchReports}
-          className="btn-primary"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
-
-  if (reports.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-gray-500 mb-4">
-          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="text-lg font-medium">No crisis reports yet</p>
-          <p className="text-sm">Be the first to submit a crisis report</p>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+          <input
+            type="password"
+            name="password"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-        <a href="/reports" className="btn-primary">
-          Submit First Report
-        </a>
-      </div>
-    );
-  }
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthMode('register')}
+            className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
+          >
+            Register
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
+  const ReporterRegisterForm = () => (
+    <div className="bg-white rounded-lg p-6 shadow-xl">
+      <h3 className="text-xl font-bold mb-4 text-gray-800">Reporter Registration</h3>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        if (formData.get('password') !== formData.get('confirmPassword')) {
+          alert('Passwords do not match!');
+          return;
+        }
+        handleReporterRegister({
+          name: formData.get('name'),
+          email: formData.get('email'),
+          password: formData.get('password')
+        });
+      }}>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+          <input
+            type="text"
+            name="name"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <input
+            type="email"
+            name="email"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+          <input
+            type="password"
+            name="password"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+          <input
+            type="password"
+            name="confirmPassword"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
+          >
+            Register
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthMode('login')}
+            className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
+          >
+            Login
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      {reports.map((report) => (
-        <div key={report.id} className="card border-l-4 border-crisis-red">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Image */}
-            <div className="lg:w-1/3">
-              <img
-                src={getIPFSGatewayURL(report.ipfsCID)}
-                alt={report.title}
-                className="w-full h-48 object-cover rounded-lg"
-                onError={(e) => {
-                  e.target.src = '/placeholder-image.svg';
-                }}
-              />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        {/* Header Section */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Crisis Reports Dashboard
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Monitor and verify crisis reports from around the world. Help ensure accurate information reaches emergency responders.
+          </p>
+        </div>
+
+        {/* Authentication Header */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-xl border border-white/20">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-lg">🚨</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Reporter Authentication</h2>
+                <p className="text-gray-600">Login or register to verify reports</p>
+              </div>
             </div>
             
-            {/* Content */}
-            <div className="lg:w-2/3 flex flex-col">
-              <div className="flex-1">
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-xl font-semibold text-gray-900">{report.title}</h3>
-                  {getVerificationStatus(report.verified, report.verificationCount)}
-                </div>
-                
-                <p className="text-gray-600 mb-4">{report.description}</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-center text-sm text-gray-500">
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {report.location}
+            <div className="flex items-center gap-3">
+              {currentReporter ? (
+                <>
+                  <div className="text-right">
+                    <p className="font-medium text-gray-800">{currentReporter.name}</p>
+                    <p className="text-sm text-gray-600">{currentReporter.email}</p>
                   </div>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {formatDate(report.timestamp)}
-                  </div>
-                </div>
-                
-                <div className="flex items-center text-sm text-gray-500 mb-4">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Reporter: {formatAddress(report.reporter)}
-                </div>
-              </div>
-              
-              {/* Verification Button */}
-              <div className="flex justify-end">
+                  <button
+                    onClick={handleReporterLogout}
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={() => handleVerifyReport(report.id)}
-                  disabled={verifying[report.id]}
-                  className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setShowAuthModal(true)}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
                 >
-                  {verifying[report.id] ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Verify Report
-                    </>
-                  )}
+                  Login / Register
                 </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Reports</p>
+                <p className="text-2xl font-bold text-gray-800">{reports.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">📊</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Verified</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {reports.filter(r => getVerificationStatus(r).status === 'verified').length}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">✅</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {reports.filter(r => getVerificationStatus(r).status === 'pending').length}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">⏳</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Unverified</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {reports.filter(r => getVerificationStatus(r).status === 'unverified').length}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">❌</span>
               </div>
             </div>
           </div>
         </div>
-      ))}
+
+        {/* Filters and Search */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 mb-8 shadow-xl border border-white/20">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Reports</label>
+              <input
+                type="text"
+                placeholder="Search by title, description, or location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+              />
+            </div>
+            <div className="md:w-48">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Status</label>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+              >
+                <option value="all">All Reports</option>
+                <option value="verified">Verified</option>
+                <option value="pending">Pending</option>
+                <option value="unverified">Unverified</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Reports List */}
+        <div className="space-y-6">
+          {filteredReports.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">📝</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">No Reports Found</h3>
+              <p className="text-gray-600">
+                {reports.length === 0 
+                  ? "No crisis reports have been submitted yet." 
+                  : "No reports match your current search or filter criteria."}
+              </p>
+            </div>
+          ) : (
+            filteredReports.map((report) => {
+              const verificationStatus = getVerificationStatus(report);
+              const approvals = report.approvals || [];
+              const uniqueApprovals = [...new Set(approvals)];
+              
+              return (
+                <div key={report.id} className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/30 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Image Section */}
+                    {report.image && (
+                      <div className="lg:w-1/3">
+                        <div className="relative rounded-xl overflow-hidden shadow-lg">
+                          <img
+                            src={report.image}
+                            alt="Crisis report"
+                            className="w-full h-48 object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Content Section */}
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">{getCategoryIcon(report.category)}</span>
+                            <h3 className="text-2xl font-bold text-gray-800">{report.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                              {formatDate(report.timestamp)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                              {report.location}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSeverityColor(report.severity)} text-white`}>
+                            {report.severity}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${verificationStatus.bgColor} ${verificationStatus.color}`}>
+                            {verificationStatus.status.charAt(0).toUpperCase() + verificationStatus.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <p className="text-gray-700 mb-4 leading-relaxed">{report.description}</p>
+                      
+                      {/* Verification Progress */}
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">Verification Progress</span>
+                          <span className="text-sm text-gray-600">
+                            {uniqueApprovals.length}/3 approvals
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              uniqueApprovals.length >= 3 ? 'bg-green-500' : 
+                              uniqueApprovals.length > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min((uniqueApprovals.length / 3) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {currentReporter ? (
+                          hasReporterApproved(report) ? (
+                            <button
+                              disabled
+                              className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium cursor-not-allowed"
+                            >
+                              ✓ Already Approved
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleApproveReport(report.id)}
+                              disabled={verifying}
+                              className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {verifying ? 'Approving...' : 'Approve Report'}
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => setShowAuthModal(true)}
+                            className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
+                          >
+                            Login to Approve
+                          </button>
+                        )}
+                        
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          Category: {report.category}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Data Management */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 mt-8 shadow-xl border border-white/20">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span className="text-2xl">🗑️</span>
+            Data Management
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={handleDeleteAllReports}
+              className="bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
+            >
+              Delete All Reports
+            </button>
+            <button
+              onClick={handleDeleteAllReporters}
+              className="bg-orange-500 text-white px-4 py-3 rounded-lg hover:bg-orange-600 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
+            >
+              Delete All Reporters
+            </button>
+            <button
+              onClick={handleDeleteAllData}
+              className="bg-purple-500 text-white px-4 py-3 rounded-lg hover:bg-purple-600 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
+            >
+              Delete Everything
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Authentication Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {authMode === 'login' ? 'Reporter Login' : 'Reporter Registration'}
+                </h2>
+                <button
+                  onClick={() => setShowAuthModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              {authMode === 'login' ? <ReporterLoginForm /> : <ReporterRegisterForm />}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+};
+
+export default ReportsList; 
